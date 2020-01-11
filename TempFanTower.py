@@ -11,9 +11,10 @@
 # https://www.thingiverse.com/thing:2493504
 #       Temp Tower PLA de 210 à 170
 #
-# Modification Laurent LALLIARD Pour ajouter la définition du ventilateur au départ
-#   Version 1.1 9/01/2020
+# Modification pour ajouter la définition du ventilateur au départ
 #
+#   Version 1.1 9/01/2020
+#   Version 1.2 11/01/2020  Modification Fan après Bridge
 #
 
 from ..Script import Script
@@ -103,22 +104,35 @@ class TempFanTower(Script):
         fanvalues_str = self.getSettingValueByKey("fanchange")
         fanvalues = fanvalues_str.split(";")
         nbval = len(fanvalues) - 1
+        usefan = False
+        
         if (nbval>0):
-            usefan = self.getSettingValueByKey("usefanvalue")
+            usefan = bool(self.getSettingValueByKey("usefanvalue"))
         else:
-            usefan = false
+            usefan = False
 
         
         currentTemperature = startTemperature
         currentfan = int((int(fanvalues[0])/100)*255)  #  100% = 255 pour ventilateur
 
         idl=0
-
+        afterbridge = False
+        
         for layer in data:
             layer_index = data.index(layer)
             
             lines = layer.split("\n")
             for line in lines:
+                if line.startswith("M106 S") and ((layer_index-changelayeroffset)>0) and (usefan) and (afterbridge):
+                    line_index = lines.index(line)
+                    currentfan = int((int(fanvalues[idl])/100)*255)  #  100% = 255 pour ventilateur
+                    lines[line_index] = "M106 S"+str(int(currentfan))+ " ; FAN MODI"
+                    afterbridge == False                    
+
+                if line.startswith("M107") and ((layer_index-changelayeroffset)>0) and (usefan):
+                    afterbridge == True
+                    line_index = lines.index(line)
+                
                 if line.startswith(";LAYER:"):
                     line_index = lines.index(line)
                     
@@ -142,7 +156,7 @@ class TempFanTower(Script):
                             lines.insert(line_index + 2, "M104 S"+str(currentTemperature))
                             if (usefan):
                                 # On repart à la valeur de départ
-                                idl=0
+                                idl = 0
                                 currentfan = int((int(fanvalues[idl])/100)*255)  #  100% = 255 pour ventilateur
                                 lines.insert(line_index + 3, "M106 S"+str(int(currentfan)))
                                                 
